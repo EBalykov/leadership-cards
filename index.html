@@ -76,18 +76,22 @@
   .scene.small .card{min-height:clamp(370px,56vh,430px)}
   .card.flip{transform:rotateY(180deg)}
   .card:focus-visible{outline:2px solid rgba(236,225,200,.6);outline-offset:4px}
+  .tilt{position:relative;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transition:transform .18s ease;will-change:transform}
   .face{grid-area:1/1;-webkit-backface-visibility:hidden;backface-visibility:hidden;transform:rotateY(0);
-    border-radius:24px;padding:1.6px;position:relative;
+    border-radius:24px;padding:1.7px;position:relative;background-size:240% 240%;background-position:0% 50%;
+    animation:foilflow 7.5s ease-in-out infinite;
     box-shadow:0 24px 60px -24px rgba(0,0,0,.5),0 16px 44px -18px rgba(0,0,0,.72)}
   .face.back{transform:rotateY(180deg)}
   .inner{position:relative;overflow:hidden;border-radius:22.5px;height:100%;
     background:linear-gradient(162deg,var(--cream-a),var(--cream-b));
     padding:clamp(17px,4.4vw,22px);display:flex;flex-direction:column}
   .holo{position:absolute;inset:0;pointer-events:none;mix-blend-mode:soft-light;background-size:200% 200%;
-    background-position:0% 50%;animation:holo 9s ease-in-out infinite;z-index:1}
-  .sheen{position:absolute;inset:0;pointer-events:none;z-index:3;mix-blend-mode:screen;opacity:.7;
-    background:linear-gradient(105deg,transparent 36%,rgba(255,255,255,.5) 46%,rgba(255,255,255,.92) 50%,rgba(255,255,255,.5) 54%,transparent 64%);
-    background-size:250% 100%;background-position:175% 0;animation:sheen 6.5s linear infinite}
+    background-position:0% 50%;animation:holo 7s ease-in-out infinite;z-index:1}
+  .sheen{position:absolute;inset:0;pointer-events:none;z-index:3;mix-blend-mode:screen;opacity:.92;
+    background:linear-gradient(105deg,transparent 34%,rgba(255,255,255,.55) 46%,rgba(255,255,255,.98) 50%,rgba(255,255,255,.55) 54%,transparent 66%);
+    background-size:250% 100%;background-position:175% 0;animation:sheen 5s linear infinite}
+  .glare{position:absolute;inset:0;pointer-events:none;z-index:4;opacity:0;transition:opacity .2s;mix-blend-mode:screen;border-radius:22.5px}
+  @keyframes foilflow{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
   @keyframes holo{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
   @keyframes sheen{0%{background-position:175% 0}55%{background-position:-75% 0}100%{background-position:-75% 0}}
   .content{position:relative;z-index:2;display:flex;flex-direction:column;flex:1 1 auto}
@@ -150,9 +154,14 @@
     opacity:0;pointer-events:none;transition:.22s;z-index:60;box-shadow:0 12px 30px -10px rgba(0,0,0,.6)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+  .gyrobtn{position:fixed;left:14px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:45;
+    border:1px solid var(--line);background:rgba(28,24,16,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    color:var(--txt);font:500 12px/1 var(--sans);padding:10px 14px;border-radius:999px;cursor:pointer;transition:opacity .4s,color .2s}
+  .gyrobtn.on{color:#e9d9b0;border-color:rgba(233,217,176,.5)}
+
   :focus-visible{outline:2px solid rgba(236,225,200,.55);outline-offset:3px}
   @media(prefers-reduced-motion:reduce){
-    .scene{animation:none}.card{transition:none}.holo,.sheen{animation:none}
+    .scene{animation:none}.card,.tilt{transition:none}.holo,.sheen,.face{animation:none}
   }
 </style>
 </head>
@@ -262,19 +271,21 @@ window.addEventListener("error",function(ev){ var p=document.getElementById("err
   function faceNode(card,side){
     var holo=FOIL[card.cat];
     var face=el("div","face "+side);
-    face.style.background="linear-gradient(135deg, "+holo[0]+", "+holo[1]+", "+holo[2]+", "+holo[0]+")";
+    face.style.backgroundImage="linear-gradient(135deg, "+holo[0]+", "+holo[1]+", "+holo[2]+", "+holo[0]+")";
     var inner=el("div","inner");
     var tint=el("div","holo");
-    tint.style.background="linear-gradient(125deg, "+hexA(holo[0],.55)+" 0%, transparent 32%, "+hexA(holo[1],.42)+" 52%, transparent 72%, "+hexA(holo[2],.55)+" 100%)";
+    tint.style.backgroundImage="linear-gradient(125deg, "+hexA(holo[0],.7)+" 0%, transparent 30%, "+hexA(holo[1],.55)+" 52%, transparent 72%, "+hexA(holo[2],.7)+" 100%)";
     tint.style.backgroundSize="200% 200%";
     var content=el("div","content"); buildContent(content,card,side);
     var sheen=el("div","sheen");
-    inner.appendChild(tint); inner.appendChild(content); inner.appendChild(sheen);
+    var glare=el("div","glare");
+    inner.appendChild(tint); inner.appendChild(content); inner.appendChild(sheen); inner.appendChild(glare);
     face.appendChild(inner);
     return face;
   }
   function cardScene(card,small){
     var scene=el("div","scene"+(small?" small":""));
+    var tilt=el("div","tilt");
     var cardEl=el("div","card");
     cardEl.setAttribute("role","button"); cardEl.setAttribute("tabindex","0"); cardEl.setAttribute("aria-pressed","false");
     cardEl.setAttribute("aria-label","Карта «"+card.title+"». Нажмите, чтобы перевернуть");
@@ -284,9 +295,10 @@ window.addEventListener("error",function(ev){ var p=document.getElementById("err
       cardEl.setAttribute("aria-label","Карта «"+card.title+"»: "+(f?"оборот":"лицо")+". Нажмите, чтобы перевернуть"); }
     cardEl.addEventListener("click",flip);
     cardEl.addEventListener("keydown",function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); flip(); } });
-    scene.appendChild(cardEl);
+    tilt.appendChild(cardEl); scene.appendChild(tilt);
     var fbtns=scene.querySelectorAll("[data-fav]"); for(var i=0;i<fbtns.length;i++)(function(b){ b.addEventListener("click",function(e){ e.stopPropagation(); toggleFav(card); }); })(fbtns[i]);
     var cbtns=scene.querySelectorAll("[data-copy]"); for(var j=0;j<cbtns.length;j++)(function(b){ b.addEventListener("click",function(e){ e.stopPropagation(); copyCard(card,cardEl); }); })(cbtns[j]);
+    wireTilt(scene);
     return scene;
   }
 
@@ -471,7 +483,43 @@ window.addEventListener("error",function(ev){ var p=document.getElementById("err
   app.appendChild(wrap);
   syncToggle();
 
-  // (наклон по курсору убран — он ставил инлайн-transform на карту и перебивал переворот)
+  // ---- наклон карты: мышь (десктоп) + гироскоп (телефон) ----
+  // наклон на отдельном слое .tilt (не на .card) — поэтому не конфликтует с переворотом
+  var canHover = !!(window.matchMedia && window.matchMedia("(hover:hover) and (pointer:fine)").matches);
+  var reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function wireTilt(scene){
+    if(reduceMotion || !canHover) return;
+    var t=scene.querySelector(".tilt"); if(!t) return;
+    scene.addEventListener("pointermove",function(e){
+      var r=scene.getBoundingClientRect(); var px=((e.clientX-r.left)/r.width-.5)*2, py=((e.clientY-r.top)/r.height-.5)*2;
+      t.style.transform="rotateX("+(-py*8).toFixed(2)+"deg) rotateY("+(px*8).toFixed(2)+"deg)";
+      var g=scene.querySelectorAll(".glare");
+      for(var i=0;i<g.length;i++){ g[i].style.opacity=".5"; g[i].style.backgroundImage="radial-gradient(circle at "+(50+px*45).toFixed(0)+"% "+(50+py*45).toFixed(0)+"%, rgba(255,255,255,.6), transparent 55%)"; }
+    });
+    scene.addEventListener("pointerleave",function(){
+      t.style.transform=""; var g=scene.querySelectorAll(".glare"); for(var i=0;i<g.length;i++) g[i].style.opacity="0";
+    });
+  }
+  function onOrient(ev){
+    if(ev.gamma==null && ev.beta==null) return;
+    var ry=Math.max(-10,Math.min(10,(ev.gamma||0)/4));
+    var rx=Math.max(-10,Math.min(10,((ev.beta||0)-40)/4));
+    var t=document.querySelectorAll(".tilt");
+    for(var i=0;i<t.length;i++) t[i].style.transform="rotateX("+rx.toFixed(2)+"deg) rotateY("+(-ry).toFixed(2)+"deg)";
+  }
+  var gyroOn=false;
+  function enableGyro(){ if(gyroOn||reduceMotion) return; try{ window.addEventListener("deviceorientation",onOrient,true); gyroOn=true; }catch(e){} }
+  (function(){
+    var DOE=window.DeviceOrientationEvent; if(!DOE||reduceMotion) return;
+    if(typeof DOE.requestPermission==="function"){
+      var gb=el("button","gyrobtn"); gb.innerHTML='<span aria-hidden="true">✦</span> наклон';
+      gb.setAttribute("aria-label","Включить отклик карты на наклон телефона");
+      gb.addEventListener("click",function(){
+        DOE.requestPermission().then(function(s){ if(s==="granted"){ enableGyro(); gb.classList.add("on"); gb.innerHTML='<span aria-hidden="true">✦</span> наклон вкл'; setTimeout(function(){ gb.style.opacity="0"; gb.style.pointerEvents="none"; },2600); } }).catch(function(){});
+      });
+      document.body.appendChild(gb);
+    } else { enableGyro(); }
+  })();
 
   // ---- keyboard ----
   window.addEventListener("keydown",function(e){
